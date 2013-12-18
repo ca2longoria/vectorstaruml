@@ -1,7 +1,7 @@
 vectorstaruml
 =============
 
-Convert StarUML's diagram uml file to an svg vector image file.
+Convert StarUML's diagram uml file to an SVG vector image file.
 
 #### Points of Interest
 * Generic UML.*View XML Nodes now converted to generic UMLView Java objects.
