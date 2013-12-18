@@ -62,8 +62,6 @@ public class StarUML
 				}
 			};
 			
-			//traverse(doc,printem);
-			
 			class NodeListIterator implements Iterable<Node>
 			{
 				public NodeListIterator(NodeList nl)
