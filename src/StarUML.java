@@ -1,11 +1,11 @@
+import java.awt.Point;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -16,7 +16,6 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import org.w3c.dom.Document;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -43,26 +42,6 @@ public class StarUML
 			catch (SAXException e) { e.printStackTrace(); }
 			catch (IOException e) { e.printStackTrace(); }
 			
-			iMap printem = new aMap()
-			{
-				public Object map(Object item, Object[] args)
-				{
-					Node n = (Node)item;
-					String tab = Global.tabs((Integer)args[0],"  ");
-					
-					NamedNodeMap nmap = n.getAttributes();
-					if (nmap != null)
-						for (int i=0; i < nmap.getLength(); ++i)
-						{
-							Node a = nmap.item(i);
-							System.out.println(tab+a);
-						}
-					
-					System.out.println(tab+n);
-					return item;
-				}
-			};
-			
 			xPath = XPathFactory.newInstance().newXPath();
 			
 			sized = xPathEval(sizedXPath);
@@ -71,40 +50,31 @@ public class StarUML
 			dependencyViews = xPathEval(dependencyViewsXPath);
 			deeseViews = xPathEval(deeseViewsXPath);
 			
-			class Lambda
-			{
-				public void eval(List<Node> nodes)
-				{ 
-					Set<String> types = new HashSet<String>(nodes.size());
-					for (Node n : nodes)
-					{
-						String type = n.getAttributes().getNamedItem("type").getTextContent();
-						String name = n.getAttributes().getNamedItem("name").getTextContent();
-						System.out.print(String.format("%-40s", type));
-						System.out.println(name);
-						types.add(type);
-					}
-					System.out.println();
-					System.out.println(types);
-				}
-			}
-			Lambda lambda = new Lambda();
-			
-			System.out.println("\nClass Views: =============================================");
-			lambda.eval(classViews);
-			
-			System.out.println("\nDependency Views: ========================================");
-			lambda.eval(dependencyViews);
-			
-			System.out.println("\nDeese Views: =============================================");
-			lambda.eval(deeseViews);
-			
+			// UMLView Factory-based construction
 			Map<String,UMLView> guidTable = new HashMap<String,UMLView>();
+			Map<String,List<UMLView>> typeTable = new HashMap<String,List<UMLView>>();
 			
-			UMLViewFactory viewFactory = new UMLViewFactory(guidTable);
+			UMLView.Factory vf = new XML.UMLViewFactory(guidTable,typeTable);
+			
+			List<UMLView> deeseViewsReally = new ArrayList<UMLView>();
 			for (Node n : deeseViews)
+				deeseViewsReally.add(vf.newUMLView(n));
+			
+			/*
+			// NOTE: "final" classes, huh...  Let's try that.
+			final class typeFilter extends aFilter<UMLView>
 			{
-				UMLView v = viewFactory.initNew(n);
+				public typeFilter(Object... params) { super(params); }
+				public boolean check(UMLView v)
+				{ return v.type.equals(params[0]); }
+			}
+			//*/
+			
+			for (String type : typeTable.keySet())
+			{
+				System.out.println(Global.leftPad(type+": ",60,"="));
+				for (UMLView v : typeTable.get(type))
+					System.out.println(v);
 			}
 		}
 		
@@ -116,6 +86,7 @@ public class StarUML
 		
 		protected List<Node> classViews;
 		protected List<Node> dependencyViews;
+		// TODO: A meaningful name to replace "deeseViews"
 		protected List<Node> deeseViews;
 		
 		private final static String sizedXPath = "PROJECT/BODY//OBJ/ATTR[@name=\"Height\"]/..";
@@ -123,35 +94,6 @@ public class StarUML
 		private final static String classViewsXPath = "PROJECT/BODY//OBJ[@type=\"UMLClassView\"]";
 		private final static String dependencyViewsXPath = "PROJECT/BODY//OBJ[@type=\"UMLDependencyView\"]";
 		private final static String deeseViewsXPath = "PROJECT/BODY//OBJ[starts-with(@type,\"UML\") and contains(@type,\"View\")]";
-		
- 		protected void traverse(Node n, iMap map)
-		{ traverse(n,map,0,0); }
-		protected void traverse(Node n, iMap map, int maxDepth)
-		{ traverse(n,map,maxDepth,0); }
-		protected void traverse(Node n, iMap map, int maxDepth, int currentDepth)
-		{
-			if (maxDepth > 0 && currentDepth > maxDepth)
-				return;
-			
-			if (map == null)
-			{
-				
-			}
-			else
-			{
-				int tab = 0;
-				Object res = map.map(n,new Object[]{new Integer(currentDepth)});
-				
-				if (n.hasChildNodes())
-				{
-					NodeList children = n.getChildNodes();
-					for (int i=0; i < children.getLength(); ++i)
-					{
-						traverse(children.item(i),map,maxDepth,currentDepth+1);
-					}
-				}
-			}
-		}
 		
 		protected List<Node> xPathEval(String pattern) throws XPathExpressionException
 		{
@@ -169,16 +111,19 @@ public class StarUML
 		protected class UMLViewFactory extends UMLView.Factory
 		{
 			public UMLViewFactory()
-			{ this(null); }
-			public UMLViewFactory(Map<String,UMLView> guidTable)
+			{ this(null,null); }
+			public UMLViewFactory(Map<String,UMLView> guidTable, Map<String,List<UMLView>> typeTable)
 			{
 				this.guidTable = guidTable;
+				this.typeTable = typeTable;
 			}
 			
 			// NOTE: This will help for later quick access to other objects via guid reference.
 			private Map<String,UMLView> guidTable = null;
+			private Map<String,List<UMLView>> typeTable = null;
 			
-			public UMLView initNew(Object... params)
+			@Override
+			public UMLView newUMLView(Object... params)
 			{
 				Node n = (Node)params[0];
 				UMLView v = new UMLView();
@@ -194,16 +139,16 @@ public class StarUML
 					v.guid = n.getAttributes().getNamedItem("guid").getTextContent();
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"Width\"]");
-					v.width = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					v.width = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"Height\"]");
-					v.height = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					v.height = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"Left\"]");
-					v.left = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					v.left = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"Top\"]");
-					v.top = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					v.top = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"LineColor\"]");
 					v.lineColor = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
@@ -212,15 +157,32 @@ public class StarUML
 					v.fillColor = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
 					
 					nlist = xPathEval(n,"./OBJ/OBJ[@name=\"NameLabel\"]/ATTR[@name=\"FontStyle\"]");
-					v.fontStyle = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					v.fontStyle = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
-					System.out.println(v);
+					nlist = xPathEval(n,"./ATTR[@name=\"Points\"]");
+					if (nlist.size() > 0)
+					{
+						v.points = new LinkedList<Point>();
+						for (String pair : nlist.get(0).getTextContent().split(";"))
+							v.points.add(new Point(
+								Integer.parseInt(pair.substring(0,pair.indexOf(','))),
+								Integer.parseInt(pair.substring(pair.indexOf(',')+1,pair.length()))));
+					}
+					else
+						v.points = null;
 				}
 				catch (XPathExpressionException e)
 				{ e.printStackTrace(); return null; }
 				
+				// Add UMLView to tables if provided to the Factory.
 				if (guidTable != null)
 					guidTable.put(v.guid, v);
+				if (typeTable != null)
+				{
+					if (!typeTable.containsKey(v.type))
+						typeTable.put(v.type, new LinkedList<UMLView>());
+					typeTable.get(v.type).add(v);
+				}
 				
 				return v;
 			}
@@ -244,6 +206,9 @@ public class StarUML
 		protected int fontStyle;
 		protected String name;
 		
+		// In line-based fellows
+		protected List<Point> points;
+		
 		public String getName()   { return name; }
 		public String getType()   { return type; }
 		public int    getWidth()  { return width; }
@@ -251,23 +216,36 @@ public class StarUML
 		public int    getLeft()   { return width; }
 		public int    getTop()    { return width; }
 		
+		public boolean hasDimensions()
+		{ return this.width >= 0 && this.height >= 0; }
+		public boolean hasPosition()
+		{
+			return
+				this.left != UMLView.InvalidPositionValue &&
+				this.top != UMLView.InvalidPositionValue; 
+		}
+		public boolean hasColor()
+		{ return this.lineColor != null && this.fillColor != null; }
+		
 		public String toString()
 		{
 			return String.format(
 					"name: %s\ntype: %s\nguid: %s\n" +
 					"width: %s\nheight: %s\nleft: %s\nttop: %s\n" +
 					"lineColor: %s\nfillColor: %s\n" +
-					"fontStyle: %s\n",
+					"fontStyle: %s\npoints: %s\n",
 				name, type, guid,
 				width, height, left, top,
 				lineColor, fillColor,
-				fontStyle);
+				fontStyle, points);
 		}
+		
+		public final static int InvalidPositionValue = 0x80000000;
 		
 		// NOTE: Trying out this Factory thing...
 		public static abstract class Factory
 		{
-			public abstract UMLView initNew(Object... params);
+			public abstract UMLView newUMLView(Object... params);
 		}
 	}
 	
@@ -295,6 +273,27 @@ public class StarUML
 		}
 	}
 	
+	public static interface iFilter <T>
+	{
+		public boolean check(T item);
+		public List<T> filter(List<T> list);
+	}
+	public static abstract class aFilter <T> implements iFilter<T>
+	{
+		public aFilter(Object... params) { this.params = params; }
+		
+		protected Object[] params;
+		
+		public abstract boolean check(T item);
+		public List<T> filter(List<T> list)
+		{
+			List<T> ret = new ArrayList<T>();
+			for (T a : list)
+				if (check(a)) ret.add(a);
+			return ret;
+		}
+	}
+	
 	public static class Global
 	{
 		public static String tabs(int depth)
@@ -307,6 +306,18 @@ public class StarUML
 			for (int i=0; i < depth; ++i)
 				sb.append(tab);
 			return sb.toString();
+		}
+		public static String leftPad(String s, int width, String pad)
+		{
+			if (s.length() < width)
+			{
+				StringBuilder sb = new StringBuilder();
+				sb.append(s);
+				for (int i=s.length(); i < width; i+=pad.length())
+					sb.append(pad);
+				return sb.toString().substring(0,width);
+			}
+			return s.substring(0,width);
 		}
 	}
 }
