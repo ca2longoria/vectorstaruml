@@ -1,9 +1,10 @@
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -62,20 +63,6 @@ public class StarUML
 				}
 			};
 			
-			class NodeListIterator implements Iterable<Node>
-			{
-				public NodeListIterator(NodeList nl)
-				{ this.nl = nl; }
-				private NodeList nl; 
-				public Iterator<Node> iterator()
-				{
-					List<Node> nodes = new ArrayList<Node>(nl.getLength());
-					for (int i=0; i < nl.getLength(); ++i)
-						nodes.add(nl.item(i));
-					return nodes.iterator();
-				}
-			}
-			
 			xPath = XPathFactory.newInstance().newXPath();
 			
 			sized = xPathEval(sizedXPath);
@@ -109,9 +96,16 @@ public class StarUML
 			System.out.println("\nDependency Views: ========================================");
 			lambda.eval(dependencyViews);
 			
-			System.out.println("\nDependency Views: ========================================");
+			System.out.println("\nDeese Views: =============================================");
 			lambda.eval(deeseViews);
 			
+			Map<String,UMLView> guidTable = new HashMap<String,UMLView>();
+			
+			UMLViewFactory viewFactory = new UMLViewFactory(guidTable);
+			for (Node n : deeseViews)
+			{
+				UMLView v = viewFactory.initNew(n);
+			}
 		}
 		
 		protected Document doc;
@@ -161,22 +155,94 @@ public class StarUML
 		
 		protected List<Node> xPathEval(String pattern) throws XPathExpressionException
 		{
-			NodeList nl = (NodeList)xPath.compile(pattern).evaluate(doc, XPathConstants.NODESET);
+			return xPathEval(doc,pattern);
+		}
+		protected List<Node> xPathEval(Node n, String pattern) throws XPathExpressionException
+		{
+			NodeList nl = (NodeList)xPath.compile(pattern).evaluate(n, XPathConstants.NODESET);
 			ArrayList<Node> ret = new ArrayList<Node>(nl.getLength());
 			for (int i=0; i < nl.getLength(); ++i)
 				ret.add(nl.item(i));
 			return ret;
 		}
+		
+		protected class UMLViewFactory extends UMLView.Factory
+		{
+			public UMLViewFactory()
+			{ this(null); }
+			public UMLViewFactory(Map<String,UMLView> guidTable)
+			{
+				this.guidTable = guidTable;
+			}
+			
+			// NOTE: This will help for later quick access to other objects via guid reference.
+			private Map<String,UMLView> guidTable = null;
+			
+			public UMLView initNew(Object... params)
+			{
+				Node n = (Node)params[0];
+				UMLView v = new UMLView();
+				
+				List<Node> nlist = null;
+				try
+				{
+					nlist = xPathEval(n,"./OBJ/OBJ[@name=\"NameLabel\"]/ATTR[@name=\"Text\"]");
+					v.name = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
+					
+					v.type = n.getAttributes().getNamedItem("type").getTextContent();
+					
+					v.guid = n.getAttributes().getNamedItem("guid").getTextContent();
+					
+					nlist = xPathEval(n,"./ATTR[@name=\"Width\"]");
+					v.width = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					
+					nlist = xPathEval(n,"./ATTR[@name=\"Height\"]");
+					v.height = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					
+					nlist = xPathEval(n,"./ATTR[@name=\"Left\"]");
+					v.left = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					
+					nlist = xPathEval(n,"./ATTR[@name=\"Top\"]");
+					v.top = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					
+					nlist = xPathEval(n,"./ATTR[@name=\"LineColor\"]");
+					v.lineColor = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
+					
+					nlist = xPathEval(n,"./ATTR[@name=\"FillColor\"]");
+					v.fillColor = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
+					
+					nlist = xPathEval(n,"./OBJ/OBJ[@name=\"NameLabel\"]/ATTR[@name=\"FontStyle\"]");
+					v.fontStyle = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : -1);
+					
+					System.out.println(v);
+				}
+				catch (XPathExpressionException e)
+				{ e.printStackTrace(); return null; }
+				
+				if (guidTable != null)
+					guidTable.put(v.guid, v);
+				
+				return v;
+			}
+		}
 	}
 	
 	public static class UMLView
 	{
-		protected String name;
+		// In UML.*View
+		protected String guid;
 		protected String type;
 		protected int width;
 		protected int height;
 		protected int left;
 		protected int top;
+		// TODO: Translation of String to Java's Color object, or at least "#fad311" style.
+		protected String lineColor;
+		protected String fillColor;
+		
+		// In LabelView
+		protected int fontStyle;
+		protected String name;
 		
 		public String getName()   { return name; }
 		public String getType()   { return type; }
@@ -185,29 +251,23 @@ public class StarUML
 		public int    getLeft()   { return width; }
 		public int    getTop()    { return width; }
 		
-		// NOTE: Trying out this Factory thing...
-		public static class Factory
+		public String toString()
 		{
-			public UMLView initNew(Object... params)
-			{
-				return null;
-			}
-			public UMLView initNew(String name, String type, int... args)
-			{
-				UMLView v = initNew(args);
-				v.name = name;
-				v.type = type;
-				return v;
-			}
-			public UMLView initNew(int... args)
-			{
-				UMLView v = new UMLView();
-				v.width = args[0];
-				v.height = args[1];
-				v.left = args[2];
-				v.top = args[3];
-				return v;
-			}
+			return String.format(
+					"name: %s\ntype: %s\nguid: %s\n" +
+					"width: %s\nheight: %s\nleft: %s\nttop: %s\n" +
+					"lineColor: %s\nfillColor: %s\n" +
+					"fontStyle: %s\n",
+				name, type, guid,
+				width, height, left, top,
+				lineColor, fillColor,
+				fontStyle);
+		}
+		
+		// NOTE: Trying out this Factory thing...
+		public static abstract class Factory
+		{
+			public abstract UMLView initNew(Object... params);
 		}
 	}
 	
