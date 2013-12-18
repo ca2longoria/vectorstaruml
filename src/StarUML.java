@@ -185,8 +185,20 @@ public class StarUML
 		public int    getLeft()   { return width; }
 		public int    getTop()    { return width; }
 		
+		// NOTE: Trying out this Factory thing...
 		public static class Factory
 		{
+			public UMLView initNew(Object... params)
+			{
+				return null;
+			}
+			public UMLView initNew(String name, String type, int... args)
+			{
+				UMLView v = initNew(args);
+				v.name = name;
+				v.type = type;
+				return v;
+			}
 			public UMLView initNew(int... args)
 			{
 				UMLView v = new UMLView();
