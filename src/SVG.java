@@ -18,7 +18,7 @@ public class SVG
 	
 	public static class Text extends DomNode
 	{
-		public Text(String text, int x, int y, String fontFamily, int fontSize, String fontWeight, String textAnchor)
+		public Text(String text, float x, float y, String fontFamily, int fontSize, String fontWeight, String textAnchor)
 		{
 			super("text");
 			attributes.put("x", ""+x);
@@ -34,7 +34,7 @@ public class SVG
 	
 	public static class Circle extends DomNode
 	{
-		public Circle(int cx, int cy, int r, String stroke, int strokeWidth, String fill)
+		public Circle(float cx, float cy, float r, String stroke, int strokeWidth, String fill)
 		{
 			super("circle");
 			attributes.put("cx", ""+cx);
@@ -50,7 +50,7 @@ public class SVG
 	
 	public static class Rect extends DomNode
 	{
-		public Rect(int x, int y, int width, int height, String stroke, int strokeWidth, String fill)
+		public Rect(float x, float y, float width, float height, String stroke, int strokeWidth, String fill)
 		{
 			super("rect");
 			attributes.put("x", ""+x);

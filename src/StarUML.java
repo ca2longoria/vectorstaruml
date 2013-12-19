@@ -271,8 +271,8 @@ public class StarUML
 				
 				// Outline, for testing...
 				SVG.DomNode outline = root.add(new SVG.Rect(
-					v.left,
-					v.top,
+					v.left-.5f,
+					v.top-.5f,
 					v.width,
 					v.height,
 					"black",
