@@ -82,10 +82,18 @@ public class StarUML
 					System.out.println(v);
 			}
 			
-			for (UMLView v : typeTable.get("UMLInterfaceView"))
+			// Output SVG xml and save to file
+			// TODO: Put all these separate actions into their own methods.
+			//for (UMLView v : typeTable.get("UMLInterfaceView"))
+			for (UMLView v : deeseViewsReally)
 			{
-				System.out.println(vr.renderUMLView(v));
-				System.out.println();
+				if (v.hasPosition() && v.hasDimensions())
+				{
+					System.out.println(vr.renderUMLView(v));
+					System.out.println();
+				}
+				else
+					System.out.println("not rendering: "+v.name+"\n");
 			}
 			
 			System.out.println(svgNode.toXMLString());
@@ -178,6 +186,14 @@ public class StarUML
 					nlist = xPathEval(n,"./OBJ/OBJ[@name=\"NameLabel\"]/ATTR[@name=\"FontStyle\"]");
 					v.fontStyle = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
+					nlist = xPathEval(n,"./ATTR[@name=\"FontFace\"]");
+					v.fontFace = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
+					
+					// If fontStyle is defined, then there *is* a fontFace, but it seems to default to Tahoma.
+					if (v.fontStyle != UMLView.InvalidPositionValue && v.fontFace == null)
+						// TODO: final static String defaultFontSomething = "Tahoma"...
+						v.fontFace = "Tahoma";
+					
 					nlist = xPathEval(n,"./ATTR[@name=\"Points\"]");
 					if (nlist.size() > 0)
 					{
@@ -222,6 +238,8 @@ public class StarUML
 				else
 				{
 					// These colors seem customized... Not sure where their table is listed.
+					if (color.equals("clMaroon"))
+						return "#800000";
 					return "UNKNOWN:"+color;
 				}
 			}
@@ -241,22 +259,59 @@ public class StarUML
 			public String renderUMLView(UMLView v)
 			{
 				// This simply makes svgRootNode checking convenient.
+				// NOTE: Ah, wait, with nesting, we won't have to add every one to the
+				//   root svg node.  Well, for now, let's keep it at a flat arrangement.
 				final class Root
 				{
+					public Root(){}
 					public SVG.DomNode add(SVG.DomNode n)
 					{ if (svgRootNode != null) svgRootNode.addChild(n); return n; }
 				}
 				Root root = new Root();
 				
+				// Outline, for testing...
+				SVG.DomNode outline = root.add(new SVG.Rect(
+					v.left,
+					v.top,
+					v.width,
+					v.height,
+					"black",
+					1,
+					"white"));
+				
+				String debug = outline.toXMLString();
+				
 				// Render the StarUML objects in SVG format.
 				if (v.type.equals("UMLInterfaceView"))
 				{
-					SVG.DomNode n = root.add(new SVG.Shape.Circle(v.left, v.top, (int)(v.width*.5), v.lineColor, 1, v.fillColor));
+					// Interface circle.
+					// TODO: Scaling horizontal and vertical radius resizing and positioning.
+					final int circlePadding = 24;
+					final int radius = (int)(.5*(v.width < (v.height-circlePadding) ? v.width : v.height-circlePadding));
+					SVG.DomNode circle = root.add(new SVG.Circle(
+						(int)(v.left+.5*v.width),
+						(int)(v.top+.5*(v.height-circlePadding)),
+						radius,
+						v.lineColor,
+						1,
+						v.fillColor));
 					
-					return n.toXMLString();
+					// Interface text.
+					// TODO: Default font size?  Where is StarUML's default font size?
+					//       Default "FontFace", though, seems to be Tahoma.
+					SVG.DomNode text = root.add(new SVG.Text(
+						v.name,
+						(int)(v.left+.5*v.width),
+						v.top+v.height - (int)(.5*11),
+						v.fontFace,
+						11,
+						"bold",
+						"middle"));
+					
+					return debug + circle.toXMLString() + text.toXMLString();
 				}
 				else
-					return "";
+					return debug;
 			}
 		}
 	}
@@ -275,6 +330,7 @@ public class StarUML
 		protected String fillColor;
 		
 		// In LabelView
+		protected String fontFace;
 		protected int fontStyle;
 		protected String name;
 		

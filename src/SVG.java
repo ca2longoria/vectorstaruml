@@ -5,22 +5,63 @@ import java.util.Map;
 
 public class SVG
 {
-	public static class Shape
+	public static class RawText extends DomNode
 	{
-		public static class Circle extends DomNode
+		public RawText(String text)
+		{ this.text = text; }
+		
+		final private String text;
+		
+		public String toXMLString()
+		{ return new String(text); }
+	}
+	
+	public static class Text extends DomNode
+	{
+		public Text(String text, int x, int y, String fontFamily, int fontSize, String fontWeight, String textAnchor)
 		{
-			public Circle(int cx, int cy, int r, String stroke, int strokeWidth, String fill)
-			{
-				super("circle");
-				attributes.put("cx", ""+cx);
-				attributes.put("cy", ""+cy);
-				attributes.put("r", ""+r);
-				attributes.put("stroke", stroke);
-				attributes.put("stroke-width", ""+strokeWidth);
-				attributes.put("fill", fill);
-				
-				this.leaf = true;
-			}
+			super("text");
+			attributes.put("x", ""+x);
+			attributes.put("y", ""+y);
+			attributes.put("font-family", fontFamily);
+			attributes.put("font-size", ""+fontSize);
+			attributes.put("font-weight", ""+fontWeight);
+			attributes.put("text-anchor", textAnchor);
+			
+			this.addChild(new RawText(text));
+		}
+	}
+	
+	public static class Circle extends DomNode
+	{
+		public Circle(int cx, int cy, int r, String stroke, int strokeWidth, String fill)
+		{
+			super("circle");
+			attributes.put("cx", ""+cx);
+			attributes.put("cy", ""+cy);
+			attributes.put("r", ""+r);
+			attributes.put("stroke", stroke);
+			attributes.put("stroke-width", ""+strokeWidth);
+			attributes.put("fill", fill);
+			
+			this.leaf = true;
+		}
+	}
+	
+	public static class Rect extends DomNode
+	{
+		public Rect(int x, int y, int width, int height, String stroke, int strokeWidth, String fill)
+		{
+			super("rect");
+			attributes.put("x", ""+x);
+			attributes.put("y", ""+y);
+			attributes.put("width", ""+width);
+			attributes.put("height", ""+height);
+			attributes.put("stroke", stroke);
+			attributes.put("stroke-width", ""+strokeWidth);
+			attributes.put("fill", ""+fill);
+			
+			this.leaf = true;
 		}
 	}
 	
