@@ -5,16 +5,6 @@ import java.util.Map;
 
 public class SVG
 {
-	public static String toXML(StarUML.UMLView v)
-	{
-		if (v.type.equals("UMLClassView"))
-		{
-			
-		}
-		
-		return null;
-	}
-	
 	public static class Shape
 	{
 		public static class Circle extends DomNode
@@ -28,7 +18,20 @@ public class SVG
 				attributes.put("stroke", stroke);
 				attributes.put("stroke-width", ""+strokeWidth);
 				attributes.put("fill", fill);
+				
+				this.leaf = true;
 			}
+		}
+	}
+	
+	public static final class BaseNode extends DomNode
+	{
+		public BaseNode(int width, int height)
+		{
+			super("svg");
+			attributes.put("width", ""+width);
+			attributes.put("height", ""+height);
+			attributes.put("xmlns","http://www.w3.org/2000/svg"); 
 		}
 	}
 	
@@ -45,6 +48,14 @@ public class SVG
 		protected Map<String,String> attributes = new HashMap<String,String>();
 		protected List<DomNode> children = new LinkedList<DomNode>();
 		
+		public DomNode addChild(DomNode n)
+		{
+			if (children.contains(n))
+				children.remove(n);
+			children.add(n);
+			return n;
+		}
+		
 		public String toXMLString()
 		{
 			StringBuilder asb = new StringBuilder();
@@ -55,7 +66,12 @@ public class SVG
 			}
 			String attribs = asb.toString();
 			
-			String header = "<"+tagName+attribs+">";
+			String header = "<"+tagName+attribs+(leaf ? "/" : "")+">";
+			
+			// Leaf opts out, here.
+			if (leaf)
+				return header;
+			
 			String footer = "</"+tagName+">";
 			
 			StringBuilder sb = new StringBuilder();

@@ -1,5 +1,7 @@
 import java.awt.Point;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,8 +55,11 @@ public class StarUML
 			// UMLView Factory-based construction
 			Map<String,UMLView> guidTable = new HashMap<String,UMLView>();
 			Map<String,List<UMLView>> typeTable = new HashMap<String,List<UMLView>>();
-			
 			UMLView.Factory vf = new XML.UMLViewFactory(guidTable,typeTable);
+			
+			// UMLView Renderer construction
+			SVG.BaseNode svgNode = new SVG.BaseNode(800, 600);
+			UMLView.Renderer vr = new XML.UMLViewSVGRenderer(svgNode);
 			
 			List<UMLView> deeseViewsReally = new ArrayList<UMLView>();
 			for (Node n : deeseViews)
@@ -76,6 +81,20 @@ public class StarUML
 				for (UMLView v : typeTable.get(type))
 					System.out.println(v);
 			}
+			
+			for (UMLView v : typeTable.get("UMLInterfaceView"))
+			{
+				System.out.println(vr.renderUMLView(v));
+				System.out.println();
+			}
+			
+			System.out.println(svgNode.toXMLString());
+			try {
+				FileOutputStream fos = new FileOutputStream(new File("bin/test.svg"));
+				fos.write(svgNode.toXMLString().getBytes());
+			}
+			catch (FileNotFoundException e) { e.printStackTrace(); }
+			catch (IOException e) { e.printStackTrace(); }
 		}
 		
 		protected Document doc;
@@ -151,10 +170,10 @@ public class StarUML
 					v.top = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"LineColor\"]");
-					v.lineColor = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
+					v.lineColor = (nlist.size() > 0 ? convertColor(nlist.get(0).getTextContent()) : null);
 					
 					nlist = xPathEval(n,"./ATTR[@name=\"FillColor\"]");
-					v.fillColor = (nlist.size() > 0 ? nlist.get(0).getTextContent() : null);
+					v.fillColor = (nlist.size() > 0 ? convertColor(nlist.get(0).getTextContent()) : null);
 					
 					nlist = xPathEval(n,"./OBJ/OBJ[@name=\"NameLabel\"]/ATTR[@name=\"FontStyle\"]");
 					v.fontStyle = (nlist.size() > 0 ? Integer.parseInt(nlist.get(0).getTextContent()) : UMLView.InvalidPositionValue);
@@ -185,6 +204,59 @@ public class StarUML
 				}
 				
 				return v;
+			}
+			
+			private String convertColor(String color)
+			{
+				if (color.charAt(0) == '$')
+				{
+					// This one is almost a direct hex analog.
+					// Remove the $00, and reverse the BGR values to, well, RGB.
+					
+					// TODO: Add checks for proper string formatting beforehand. Kind of
+					//       just *assuming* it'll look this way if it starts with a '$'.
+					
+					String raw = color.replace("$00", "");
+					return "#" + raw.substring(4,6) + raw.substring(2,4) + raw.substring(0,2);
+				}
+				else
+				{
+					// These colors seem customized... Not sure where their table is listed.
+					return "UNKNOWN:"+color;
+				}
+			}
+		}
+		
+		protected class UMLViewSVGRenderer extends UMLView.Renderer
+		{
+			public UMLViewSVGRenderer() { this.svgRootNode = null; }
+			public UMLViewSVGRenderer(SVG.DomNode rootNode)
+			{
+				this.svgRootNode = rootNode;
+			}
+			
+			protected SVG.DomNode svgRootNode;
+			
+			@Override
+			public String renderUMLView(UMLView v)
+			{
+				// This simply makes svgRootNode checking convenient.
+				final class Root
+				{
+					public SVG.DomNode add(SVG.DomNode n)
+					{ if (svgRootNode != null) svgRootNode.addChild(n); return n; }
+				}
+				Root root = new Root();
+				
+				// Render the StarUML objects in SVG format.
+				if (v.type.equals("UMLInterfaceView"))
+				{
+					SVG.DomNode n = root.add(new SVG.Shape.Circle(v.left, v.top, (int)(v.width*.5), v.lineColor, 1, v.fillColor));
+					
+					return n.toXMLString();
+				}
+				else
+					return "";
 			}
 		}
 	}
@@ -246,6 +318,11 @@ public class StarUML
 		public static abstract class Factory
 		{
 			public abstract UMLView newUMLView(Object... params);
+		}
+		
+		public static abstract class Renderer
+		{
+			public abstract String renderUMLView(UMLView v);
 		}
 	}
 	
