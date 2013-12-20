@@ -4,7 +4,7 @@ vectorstaruml
 Convert StarUML's diagram uml file to an SVG vector image file.
 
 #### Latest Progress
-##### [test.8ed1b6d.svg](https://s3.amazonaws.com/ca2longoria-github-assets/test.8ed1b6d.svg) vs. [spritely-diagram.gif](https://f.cloud.github.com/assets/387353/1748170/ddb7fc5c-64a4-11e3-8746-f4e66fa1612b.gif)
+##### [test.8ed1b6d.svg](https://s3.amazonaws.com/ca2longoria-github-assets/vectorstaruml/test.8ed1b6d.svg) vs. [spritely-diagram.gif](https://f.cloud.github.com/assets/387353/1748170/ddb7fc5c-64a4-11e3-8746-f4e66fa1612b.gif) from uml file [spritely.uml](https://s3.amazonaws.com/ca2longoria-github-assets/vectorstaruml/spritely.8ed1b6d.uml)
 
 #### Points of Interest
 * Generic UML.*View XML Nodes now converted to generic UMLView Java objects.
