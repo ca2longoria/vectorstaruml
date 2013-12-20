@@ -52,6 +52,9 @@ public class StarUML
 			dependencyViews = xPathEval(dependencyViewsXPath);
 			deeseViews = xPathEval(deeseViewsXPath);
 			
+			// TODO: Means of integrating non-View nodes as well into guidTable and typeTable.
+			//List<Node> allOperations = xPathEval(allNodesXPath);
+			
 			// UMLView Factory-based construction
 			Map<String,UMLView> guidTable = new HashMap<String,UMLView>();
 			Map<String,List<UMLView>> typeTable = new HashMap<String,List<UMLView>>();
@@ -91,10 +94,12 @@ public class StarUML
 				}
 			}
 			
-			SVG.BaseNode svgNode = new SVG.BaseNode((int)(maxx-minx)+2, (int)(maxy-miny)+1);
-			SVG.BaseNode svgOffsetNode = new SVG.BaseNode((int)maxx+1, (int)maxy+1);
-				svgOffsetNode.attributes.put("x", ""+(int)(-minx+1));
-				svgOffsetNode.attributes.put("y", ""+(int)(-miny+1));
+			final int marginx = 24;
+			final int marginy = 20;
+			SVG.BaseNode svgNode = new SVG.BaseNode((int)(maxx-minx)+2+2*marginx, (int)(maxy-miny)+1+2*marginy);
+			SVG.BaseNode svgOffsetNode = new SVG.BaseNode((int)maxx+1+2, (int)maxy+1);
+				svgOffsetNode.attributes.put("x", ""+(int)(-minx+1+marginx));
+				svgOffsetNode.attributes.put("y", ""+(int)(-miny+1+marginy));
 			svgNode.addChild(svgOffsetNode);
 			
 			UMLView.Renderer vr = new XML.UMLViewSVGRenderer(svgOffsetNode);
@@ -148,6 +153,8 @@ public class StarUML
 		private final static String classViewsXPath = "PROJECT/BODY//OBJ[@type=\"UMLClassView\"]";
 		private final static String dependencyViewsXPath = "PROJECT/BODY//OBJ[@type=\"UMLDependencyView\"]";
 		private final static String deeseViewsXPath = "PROJECT/BODY//OBJ[starts-with(@type,\"UML\") and contains(@type,\"View\")]";
+		
+		private final static String classObjectsXPath = "PROJECT/BODY//OBJ[@type=\"UMLClass\"]";
 		
 		protected List<Node> xPathEval(String pattern) throws XPathExpressionException
 		{
@@ -300,17 +307,19 @@ public class StarUML
 				//   to point to the circle's center.
 				final class InterfaceCircle
 				{
-					public float[] center(UMLView v, float circlePadding)
+					public float[] center(UMLView v, float circlePadding, float rimPadding)
 					{
 						return new float[]{
 							(int)(v.left+.5*v.width),
 							(int)(v.top+.5*(v.height-circlePadding)),
-							(int)(.5*(v.width < (v.height-circlePadding) ? v.width : v.height-circlePadding))}; 
+							(int)(.5*(v.width < (v.height-circlePadding) ? v.width : v.height-circlePadding))-.5f*rimPadding}; 
 					}
 				}
 				InterfaceCircle interfaceCircle = new InterfaceCircle();
 				
 				// Outline, for testing...
+				String debug = ""; 
+				/*
 				SVG.DomNode outline = root.add(new SVG.Rect(
 					v.left-.5f,
 					v.top-.5f,
@@ -320,7 +329,8 @@ public class StarUML
 					1,
 					"white"));
 				
-				String debug = outline.toXMLString();
+				debug = outline.toXMLString();
+				//*/
 				
 				// Render the StarUML objects in SVG format.
 				if (v.type.equals("UMLInterfaceView"))
@@ -328,7 +338,9 @@ public class StarUML
 					// Interface circle.
 					// TODO: Scaling horizontal and vertical radius resizing and positioning.
 					final int circlePadding = 24;
-					float[] vals = interfaceCircle.center(v, circlePadding);
+					// NOTE: Looks like rimPadding is 0 when no... lines... connect to the circle.
+					final int rimPadding = 5;
+					float[] vals = interfaceCircle.center(v, circlePadding, rimPadding);
 					SVG.DomNode circle = root.add(new SVG.Circle(
 						vals[0],
 						vals[1],
@@ -355,19 +367,20 @@ public class StarUML
 				{
 					// Background.
 					SVG.DomNode rect = root.add(new SVG.Rect(
-						v.left-.5f,
+						v.left+1.5f,
 						v.top-.5f,
-						v.width+1,
-						v.height,
+						v.width-2,
+						v.height-2,
 						v.lineColor,
 						1,
 						v.fillColor));
 					
 					// 6 + fontHeight + 6?
+					final int nameContainerHeight = (int)(6+11+6);
 					SVG.DomNode name = root.add(new SVG.Text(
 						v.name,
 						v.left+.5f*v.width,
-						v.top+6+(.8f*11),
+						v.top+6+(.7f*11),
 						v.fontFace,
 						11,
 						"bold",
@@ -378,6 +391,54 @@ public class StarUML
 				else
 					return debug;
 			}
+		}
+	}
+	
+	public static class UMLClass
+	{
+		// TODO: These also have public/private properties.
+		protected List<Property> operations;
+		protected List<Property> attributes;
+		
+		public List<Property> getOperations()
+		{
+			List<Property> ret = new ArrayList<Property>(operations.size());
+			for (Property p : operations)
+				ret.add(new Property(p));
+			return ret;
+		}
+		public List<Property> getAttributes()
+		{
+			List<Property> ret = new ArrayList<Property>(operations.size());
+			for (Property p : attributes)
+				ret.add(new Property(p));
+			return ret;
+		}
+		
+		// TODO: This may be universal enough to merit its own StarUML.Property class.
+		public static class Property
+		{
+			public Property(Property p)
+			{ this(p.text, p.detail); }
+			public Property(String text, Detail detail)
+			{ this.text = text; this.detail = detail; }
+			
+			public final String text;
+			public final Detail detail;
+			
+			// TODO: What are these called...? I don't recall...
+			public static enum Detail
+			{
+				Public,
+				Protected,
+				Private,
+				Package
+			}
+		}
+		
+		public static abstract class Factory
+		{
+			public abstract UMLClass newUMLClass(Object... params);
 		}
 	}
 	
@@ -402,12 +463,24 @@ public class StarUML
 		// In line-based fellows
 		protected List<Point> points;
 		
-		public String getName()   { return name; }
-		public String getType()   { return type; }
+		protected UMLClass umlClass;
+		
+		public String getName()   { return new String(name); }
+		public String getType()   { return new String(type); }
 		public int    getWidth()  { return width; }
 		public int    getHeight() { return width; }
 		public int    getLeft()   { return width; }
 		public int    getTop()    { return width; }
+		
+		public String getLineColor() { return new String(lineColor); }
+		public String getFillColor() { return new String(fillColor); }
+		
+		public String getFontFace() { return new String(fontFace); }
+		public int getFontStyle() { return fontStyle; }
+		
+		public List<Point> getPoints() { return new LinkedList<Point>(points); }
+		
+		public UMLClass getUMLClass() { return umlClass; }
 		
 		public boolean hasDimensions()
 		{ return this.width >= 0 && this.height >= 0; }
