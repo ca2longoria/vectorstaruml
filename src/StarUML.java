@@ -57,13 +57,47 @@ public class StarUML
 			Map<String,List<UMLView>> typeTable = new HashMap<String,List<UMLView>>();
 			UMLView.Factory vf = new XML.UMLViewFactory(guidTable,typeTable);
 			
-			// UMLView Renderer construction
-			SVG.BaseNode svgNode = new SVG.BaseNode(800, 600);
-			UMLView.Renderer vr = new XML.UMLViewSVGRenderer(svgNode);
-			
 			List<UMLView> deeseViewsReally = new ArrayList<UMLView>();
 			for (Node n : deeseViews)
 				deeseViewsReally.add(vf.newUMLView(n));
+			
+			for (String type : typeTable.keySet())
+			{
+				System.out.println(Global.leftPad(type+": ",60,"="));
+				for (UMLView v : typeTable.get(type))
+					System.out.println(v);
+			}
+			
+			
+			// UMLView Renderer construction
+			float minx = 0x7fffffff;
+			float miny = 0x7fffffff;
+			
+			float maxx = -1;
+			float maxy = -1;
+			
+			for (UMLView v : deeseViewsReally)
+			{
+				if (v.hasPosition() && v.hasDimensions())
+				{
+					if (v.left >= 0 && v.left < minx)
+						minx = v.left;
+					if (v.top >= 0 && v.top < miny)
+						miny = v.top;
+					if (v.left+v.width > maxx)
+						maxx = v.left+v.width;
+					if (v.top+v.height > maxy)
+						maxy = v.top+v.height;
+				}
+			}
+			
+			SVG.BaseNode svgNode = new SVG.BaseNode((int)(maxx-minx)+2, (int)(maxy-miny)+1);
+			SVG.BaseNode svgOffsetNode = new SVG.BaseNode((int)maxx+1, (int)maxy+1);
+				svgOffsetNode.attributes.put("x", ""+(int)(-minx+1));
+				svgOffsetNode.attributes.put("y", ""+(int)(-miny+1));
+			svgNode.addChild(svgOffsetNode);
+			
+			UMLView.Renderer vr = new XML.UMLViewSVGRenderer(svgOffsetNode);
 			
 			/*
 			// NOTE: "final" classes, huh...  Let's try that.
@@ -74,13 +108,6 @@ public class StarUML
 				{ return v.type.equals(params[0]); }
 			}
 			//*/
-			
-			for (String type : typeTable.keySet())
-			{
-				System.out.println(Global.leftPad(type+": ",60,"="));
-				for (UMLView v : typeTable.get(type))
-					System.out.println(v);
-			}
 			
 			// Output SVG xml and save to file
 			// TODO: Put all these separate actions into their own methods.
@@ -269,11 +296,25 @@ public class StarUML
 				}
 				Root root = new Root();
 				
+				// NOTE: Putting this out here, since it will be used later by lines
+				//   to point to the circle's center.
+				final class InterfaceCircle
+				{
+					public float[] center(UMLView v, float circlePadding)
+					{
+						return new float[]{
+							(int)(v.left+.5*v.width),
+							(int)(v.top+.5*(v.height-circlePadding)),
+							(int)(.5*(v.width < (v.height-circlePadding) ? v.width : v.height-circlePadding))}; 
+					}
+				}
+				InterfaceCircle interfaceCircle = new InterfaceCircle();
+				
 				// Outline, for testing...
 				SVG.DomNode outline = root.add(new SVG.Rect(
 					v.left-.5f,
 					v.top-.5f,
-					v.width,
+					v.width+1,
 					v.height,
 					"black",
 					1,
@@ -287,11 +328,11 @@ public class StarUML
 					// Interface circle.
 					// TODO: Scaling horizontal and vertical radius resizing and positioning.
 					final int circlePadding = 24;
-					final int radius = (int)(.5*(v.width < (v.height-circlePadding) ? v.width : v.height-circlePadding));
+					float[] vals = interfaceCircle.center(v, circlePadding);
 					SVG.DomNode circle = root.add(new SVG.Circle(
-						(int)(v.left+.5*v.width),
-						(int)(v.top+.5*(v.height-circlePadding)),
-						radius,
+						vals[0],
+						vals[1],
+						vals[2],
 						v.lineColor,
 						1,
 						v.fillColor));
@@ -309,6 +350,30 @@ public class StarUML
 						"middle"));
 					
 					return debug + circle.toXMLString() + text.toXMLString();
+				}
+				else if (v.type.equals("UMLClassView"))
+				{
+					// Background.
+					SVG.DomNode rect = root.add(new SVG.Rect(
+						v.left-.5f,
+						v.top-.5f,
+						v.width+1,
+						v.height,
+						v.lineColor,
+						1,
+						v.fillColor));
+					
+					// 6 + fontHeight + 6?
+					SVG.DomNode name = root.add(new SVG.Text(
+						v.name,
+						v.left+.5f*v.width,
+						v.top+6+(.8f*11),
+						v.fontFace,
+						11,
+						"bold",
+						"middle"));
+					
+					return debug + rect.toXMLString() + name.toXMLString();
 				}
 				else
 					return debug;
