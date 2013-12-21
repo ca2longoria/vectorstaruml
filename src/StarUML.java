@@ -520,6 +520,35 @@ public class StarUML
 		}
 	}
 	
+	public static class UMLThing
+	{
+		protected String guid;
+		public String getGUID() { return guid; }
+		
+		public static class Property
+		{
+			public Property(String text, Detail detail)
+			{ this.text = text; this.detail = detail; }
+			
+			public final String text;
+			public final Detail detail;
+			
+			public static enum Detail
+			{
+				Public,
+				Protected,
+				Private,
+				Package
+			}
+		}
+		
+		public static final int InvalidValue = 0x7fffffff;
+		public static abstract class Factory<T extends UMLThing>
+		{
+			public abstract T newUMLObject(Object... params);
+		}
+	}
+	
 	public static interface iMap
 	{
 		public Object map(Object item);
