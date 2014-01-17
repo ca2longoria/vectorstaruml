@@ -1,5 +1,6 @@
+package net.synapsehaven.vectorstaruml.xml;
 
-public class UMLView extends StarUML.UMLThing
+public class UMLView extends UMLNode
 {
 	protected String name;
 	protected String type;
